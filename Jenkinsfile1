@@ -1,4 +1,3 @@
-Only Docker compose up -------------
 pipeline {
     agent any
 
@@ -13,9 +12,17 @@ pipeline {
     }
 stages {
 
+        stage("Workspace cleanup"){
+            steps{
+                script{
+                    cleanWs()
+                }
+            }
+        }
+
         stage('Git Checkout') {
             steps {
-                git 'https://github.com/Nishantbadhiye/Ecommerce-App-Kastro.git'
+                git "https://github.com/Nishantbadhiye/Wonderlust.git" branch: "main"
             }
         }
 
@@ -55,11 +62,21 @@ stages {
             }
         }
 
-        stage('Docker Build & Tag') {
+        stage('Build and Push Image') {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'docker-cred') {
-                        sh "docker build -t ${DOCKER_IMAGE} ."
+                    env.IMAGE_TAG = "build-${BUILD_NUMBER}"
+
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker-cred',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh """
+                        docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        """
                     }
                 }
             }
@@ -72,25 +89,12 @@ stages {
             }
         }
 
-        stage('Push Docker Image') {
-            steps {
-                script {
-                    withDockerRegistry(credentialsId: 'docker-cred') {
-                        sh "docker push ${DOCKER_IMAGE}"
-                    }
-                }
+
+        stage("Deploy using Docker compose"){
+            steps{
+                sh "docker-compose up -d"
             }
         }
-
-        stage('Deploy to Container') {
-            steps {
-                script {
-                    sh "docker stop ecommerce-container || true && docker rm ecommerce-container || true"
-                    sh "docker run -d --name ecommerce-container -p 8083:8080 ${DOCKER_IMAGE}"
-                }
-            }
-        }
-
 
     }
 }
