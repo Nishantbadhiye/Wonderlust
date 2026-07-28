@@ -43,6 +43,33 @@ pipeline {
                 sh 'trivy fs . > trivyfs.txt'
             }
         }
+
+
+stage("Docker: Build Images"){
+            steps{
+                script{
+                        echo "Building Docker image..."
+                        dir('backend'){
+                            docker_build("wanderlust-backend-beta","${params.BACKEND_DOCKER_TAG}","madhupdevops")
+                        }
+                    
+                        dir('frontend'){
+                            docker_build("wanderlust-frontend-beta","${params.FRONTEND_DOCKER_TAG}","madhupdevops")
+                        }
+                }
+            }
+        }
+        
+        stage("Docker: Push to DockerHub"){
+            steps{
+                script{
+                    echo "Pushing Docker image to registry..."
+                       docker push kastrov/wanderlust-latest:latest 
+                       docker push kastrov/wanderlust-backend:latest
+                }
+            }
+        }
+    }
         stage('Docker Build & Push') {
             steps {
                 script {
@@ -76,6 +103,32 @@ pipeline {
                 }
             }
         }
+
+stage("Git: Code update and push to GitHub"){
+            steps{
+                script{
+                    withCredentials([gitUsernamePassword(credentialsId: 'Github-cred', gitToolName: 'Default')]) {
+                        sh '''
+                        echo "Checking repository status: "
+                        git status
+                    
+                        echo "Adding changes to git: "
+                        git add .
+                        
+                        echo "Commiting changes: "
+                        git commit -m "Updated environment variables"
+                        
+                        echo "Pushing changes to github: "
+                        git push https://github.com/LondheShubham153/Wanderlust-Mega-Project.git main
+                    '''
+                    }
+                }
+            }
+        }
+    }
+
+
+
     post {
         always {
             emailext attachLog: true,
